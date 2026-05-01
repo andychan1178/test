@@ -28,6 +28,16 @@ Required fields:
 - `signingPublicKey`: sender public key file (`.asc`) for signature verification
 - `passphrase`: optional private key passphrase
 
+## Test keys included
+
+The repository now includes generated test key pairs in `test-keys/`:
+- `sender-public.asc`
+- `sender-private.asc`
+- `recipient-public.asc`
+- `recipient-private.asc`
+
+These are for local testing only (no passphrase).
+
 ## cURL examples
 
 Encrypt and sign:
@@ -35,9 +45,8 @@ Encrypt and sign:
 curl -X POST http://localhost:8080/api/gpg/process \
   -F "purpose=encrypt" \
   -F "file=@plain.txt" \
-  -F "encryptionPublicKey=@recipient-public.asc" \
-  -F "signingPrivateKey=@sender-private.asc" \
-  -F "passphrase=your-passphrase" \
+  -F "encryptionPublicKey=@test-keys/recipient-public.asc" \
+  -F "signingPrivateKey=@test-keys/sender-private.asc" \
   --output plain.txt.pgp
 ```
 
@@ -46,8 +55,7 @@ Decrypt and verify:
 curl -X POST http://localhost:8080/api/gpg/process \
   -F "purpose=decrypt" \
   -F "file=@plain.txt.pgp" \
-  -F "decryptionPrivateKey=@recipient-private.asc" \
-  -F "signingPublicKey=@sender-public.asc" \
-  -F "passphrase=your-passphrase" \
+  -F "decryptionPrivateKey=@test-keys/recipient-private.asc" \
+  -F "signingPublicKey=@test-keys/sender-public.asc" \
   --output plain.txt
 ```
