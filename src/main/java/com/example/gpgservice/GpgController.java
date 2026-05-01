@@ -19,9 +19,37 @@ import java.io.IOException;
 public class GpgController {
 
     private final GpgCryptoService gpgCryptoService;
+    private final GpgKeyGenerationService gpgKeyGenerationService;
 
-    public GpgController(GpgCryptoService gpgCryptoService) {
+    public GpgController(GpgCryptoService gpgCryptoService, GpgKeyGenerationService gpgKeyGenerationService) {
         this.gpgCryptoService = gpgCryptoService;
+        this.gpgKeyGenerationService = gpgKeyGenerationService;
+    }
+
+
+
+    @PostMapping(value = "/generate-keys")
+    public ResponseEntity<byte[]> generateKeys(
+            @RequestParam(value = "bankUserId", defaultValue = "Bank <bank@example.com>") String bankUserId,
+            @RequestParam(value = "bankPassphrase", defaultValue = "") String bankPassphrase,
+            @RequestParam(value = "clientUserId", defaultValue = "Client <client@example.com>") String clientUserId,
+            @RequestParam(value = "clientPassphrase", defaultValue = "") String clientPassphrase
+    ) throws Exception {
+        var keyFiles = gpgKeyGenerationService.generateBankAndClientKeySet(bankUserId, bankPassphrase, clientUserId, clientPassphrase);
+
+        java.io.ByteArrayOutputStream zipOut = new java.io.ByteArrayOutputStream();
+        try (java.util.zip.ZipOutputStream zos = new java.util.zip.ZipOutputStream(zipOut)) {
+            for (var entry : keyFiles.entrySet()) {
+                zos.putNextEntry(new java.util.zip.ZipEntry(entry.getKey()));
+                zos.write(entry.getValue().getBytes());
+                zos.closeEntry();
+            }
+        }
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"pgp-keyset.zip\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(zipOut.toByteArray());
     }
 
     @PostMapping(value = "/process", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -68,7 +96,7 @@ public class GpgController {
                 .body(result);
     }
 
-    @ExceptionHandler({IllegalArgumentException.class, PGPException.class, IOException.class})
+    @ExceptionHandler({IllegalArgumentException.class, PGPException.class, IOException.class, Exception.class})
     public ResponseEntity<String> handleException(Exception ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
     }
