@@ -28,8 +28,10 @@ public class GpgController {
     public ResponseEntity<byte[]> processFile(
             @RequestParam("purpose") String purpose,
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "publicKey", required = false) String publicKey,
-            @RequestParam(value = "privateKey", required = false) String privateKey,
+            @RequestParam(value = "encryptionPublicKey", required = false) MultipartFile encryptionPublicKey,
+            @RequestParam(value = "signingPrivateKey", required = false) MultipartFile signingPrivateKey,
+            @RequestParam(value = "signingPublicKey", required = false) MultipartFile signingPublicKey,
+            @RequestParam(value = "decryptionPrivateKey", required = false) MultipartFile decryptionPrivateKey,
             @RequestParam(value = "passphrase", required = false) String passphrase
     ) throws IOException, PGPException {
 
@@ -37,16 +39,24 @@ public class GpgController {
         String outputName;
 
         if ("encrypt".equalsIgnoreCase(purpose)) {
-            if (publicKey == null || publicKey.isBlank()) {
-                throw new IllegalArgumentException("publicKey is required for encrypt purpose.");
-            }
-            result = gpgCryptoService.encrypt(file.getBytes(), publicKey);
+            requireFile(encryptionPublicKey, "encryptionPublicKey");
+            requireFile(signingPrivateKey, "signingPrivateKey");
+            result = gpgCryptoService.encryptAndSign(
+                    file.getBytes(),
+                    encryptionPublicKey.getBytes(),
+                    signingPrivateKey.getBytes(),
+                    passphrase
+            );
             outputName = safeName(file.getOriginalFilename()) + ".pgp";
         } else if ("decrypt".equalsIgnoreCase(purpose)) {
-            if (privateKey == null || privateKey.isBlank()) {
-                throw new IllegalArgumentException("privateKey is required for decrypt purpose.");
-            }
-            result = gpgCryptoService.decrypt(file.getBytes(), privateKey, passphrase);
+            requireFile(decryptionPrivateKey, "decryptionPrivateKey");
+            requireFile(signingPublicKey, "signingPublicKey");
+            result = gpgCryptoService.decryptAndVerify(
+                    file.getBytes(),
+                    decryptionPrivateKey.getBytes(),
+                    signingPublicKey.getBytes(),
+                    passphrase
+            );
             outputName = "decrypted-" + safeName(file.getOriginalFilename());
         } else {
             throw new IllegalArgumentException("purpose must be encrypt or decrypt.");
@@ -61,6 +71,12 @@ public class GpgController {
     @ExceptionHandler({IllegalArgumentException.class, PGPException.class, IOException.class})
     public ResponseEntity<String> handleException(Exception ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    }
+
+    private void requireFile(MultipartFile file, String name) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException(name + " is required.");
+        }
     }
 
     private String safeName(String input) {

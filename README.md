@@ -1,6 +1,6 @@
 # GPG File Service (Spring Boot)
 
-This service accepts a file and GPG key material and either encrypts or decrypts based on `purpose` (`encrypt` or `decrypt`).
+This service accepts file uploads for GPG operations and processes them based on `purpose` (`encrypt` or `decrypt`).
 
 ## Run
 
@@ -12,34 +12,42 @@ mvn spring-boot:run
 
 `POST /api/gpg/process` (multipart/form-data)
 
-Parameters:
-- `purpose`: `encrypt` or `decrypt`
-- `file`: file to process
-- `publicKey`: required for `encrypt` (ASCII-armored public key)
-- `privateKey`: required for `decrypt` (ASCII-armored private key)
-- `passphrase`: optional passphrase for private key
+### Encrypt (encrypt + sign)
+Required fields:
+- `purpose=encrypt`
+- `file`: plaintext file
+- `encryptionPublicKey`: recipient public key file (`.asc`)
+- `signingPrivateKey`: sender private key file (`.asc`)
+- `passphrase`: optional private key passphrase
 
-### Encrypt example
+### Decrypt (decrypt + verify signature)
+Required fields:
+- `purpose=decrypt`
+- `file`: encrypted `.pgp` file
+- `decryptionPrivateKey`: recipient private key file (`.asc`)
+- `signingPublicKey`: sender public key file (`.asc`) for signature verification
+- `passphrase`: optional private key passphrase
 
+## cURL examples
+
+Encrypt and sign:
 ```bash
 curl -X POST http://localhost:8080/api/gpg/process \
   -F "purpose=encrypt" \
   -F "file=@plain.txt" \
-  -F "publicKey=$(cat public.asc)" \
+  -F "encryptionPublicKey=@recipient-public.asc" \
+  -F "signingPrivateKey=@sender-private.asc" \
+  -F "passphrase=your-passphrase" \
   --output plain.txt.pgp
 ```
 
-### Decrypt example
-
+Decrypt and verify:
 ```bash
 curl -X POST http://localhost:8080/api/gpg/process \
   -F "purpose=decrypt" \
   -F "file=@plain.txt.pgp" \
-  -F "privateKey=$(cat private.asc)" \
+  -F "decryptionPrivateKey=@recipient-private.asc" \
+  -F "signingPublicKey=@sender-public.asc" \
   -F "passphrase=your-passphrase" \
   --output plain.txt
 ```
-
-## Maven GPG Plugin
-
-The `maven-gpg-plugin` is configured in `pom.xml` to sign artifacts during the `verify` phase.
